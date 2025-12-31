@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chill-est Mini Chess with Bot</title>
+  <style>
+    body {
+      background: #0b0c10;
+      color: #c5c6c7;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin: 0 0 6px 0;
+      color: #66fcf1;
+    }
+
+    #top-bar {
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .clock {
+      background: #1f2833;
+      padding: 8px 12px;
+      border-radius: 6px;
+      min-width: 90px;
+      text-align: center;
+      font-weight: 600;
+      border: 1px solid #45a29e;
+    }
+
+    .clock.active {
+      background: #45a29e;
+      color: #0b0c10;
+    }
+
+    #status {
+      font-size: 14px;
+      color: #c5c6c7;
+    }
+
+    #main-area {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    #board {
+      border-collapse: collapse;
+      box-shadow: 0 0 15px rgba(0,0,0,0.6);
+    }
+
+    #board td {
+      width: 64px;
+      height: 64px;
+      text-align: center;
+      vertical-align: middle;
+      font-size: 40px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      transition: transform 0.05s ease;
+    }
+
+    #board td:active {
+      transform: scale(0.97);
+    }
+
+    /* Lichess-style clear colors */
+    .light {
+      background: #2b2b2b;
+    }
+
+    .dark {
+      background: #1a1a1a;
+    }
+
+    .selected {
+      outline: 3px solid #66fcf1;
+      outline-offset: -3px;
+    }
+
+    .highlight-move {
+      box-shadow: inset 0 0 0 3px rgba(102,252,241,0.7);
+    }
+
+    .dot {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.35);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .capture-ring {
+      position: absolute;
+      width: 80%;
+      height: 80%;
+      border-radius: 50%;
+      border: 3px solid rgba(0,0,0,0.6);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    #side-panel {
+      width: 280px;
+      max-width: 90vw;
+      background: #1f2833;
+      border-radius: 8px;
+      padding: 10px;
+      box-sizing: border-box;
+      border: 1px solid #45a29e;
+    }
+
+    #side-panel h2 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: #66fcf1;
+    }
+
+    #moves {
+      background: #0b0c10;
+      border-radius: 4px;
+      padding: 6px;
+      height: 220px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.4;
+      border: 1px solid #45a29e;
+      white-space: pre-wrap;
+    }
+
+    #controls {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    button {
+      padding: 6px 10px;
+      background: #45a29e;
+      color: #0b0c10;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: #1f2833;
+      color: #c5c6c7;
+      border: 1px solid #45a29e;
+    }
+
+    button:hover {
+      filter: brightness(1.1);
+    }
+
+    select {
+      background: #0b0c10;
+      color: #c5c6c7;
+      border-radius: 4px;
+      border: 1px solid #45a29e;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+
+    #bottom-bar {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #818d92;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chill-est Mini Chess</h1>
+  <div id="top-bar">
+    <div class="clock" id="whiteClock">White: 05:00</div>
+    <div id="status">Turn: White • Click a piece to move</div>
+    <div class="clock" id="blackClock">Black: 05:00</div>
+  </div>
+
+  <div id="main-area">
+    <table id="board"></table>
+
+    <div id="side-panel">
+      <h2>Move log</h2>
+      <div id="moves"></div>
+      <div id="controls">
+        <button id="resetBtn">New game</button>
+        <button id="flipBtn" class="secondary">Flip board</button>
+        <button id="pauseBtn" class="secondary">Pause clocks</button>
+        <select id="modeSelect" title="Game mode">
+          <option value="hvh">Human vs Human</option>
+          <option value="hvb">Human (White) vs Bot (Black)</option>
+          <option value="bvh">Bot (White) vs Human (Black)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-bar">
+    Local board • Legal moves • Medium bot (greedy captures) • No engine server, all offline.
+  </div>
+
+  <script>
+  const PIECES = {
+  white: {
+    K: "♔",
+    Q: "♕",
+    R: "♖",
+    B: "♗",
+    N: "♘",
+    P: "♙"
+  },
+  black: {
+    K: "♚",
+    Q: "♛",
+    R: "♜",
+    B: "♝",
+    N: "♞",
+    P: "♟"
+  }
+};
+    const pieceValues = {
+      P: 1,
+      N: 3,
+      B: 3,
+      R: 5,
+      Q: 9,
+      K: 1000
+    };
+
+    let board = [];
+    let selected = null;
+    let currentTurn = "white";
+    let moveHistory = [];
+    let lastMove = null;
+    let flipped = false;
+
+    let whiteTime = 5 * 60;
+    let blackTime = 5 * 60;
+    let clockInterval = null;
+    let clocksPaused = false;
+
+    let mode = "hvh"; // hvh, hvb, bvh
+    let botColor = null;
+    let gameOver = false;
+
+    const boardElement = document.getElementById("board");
+    const statusElement = document.getElementById("status");
+    const movesElement = document.getElementById("moves");
+    const resetBtn = document.getElementById("resetBtn");
+    const flipBtn = document.getElementById("flipBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const whiteClock = document.getElementById("whiteClock");
+    const blackClock = document.getElementById("blackClock");
+    const modeSelect = document.getElementById("modeSelect");
+
+    function createEmptyBoard() {
+      board = Array.from({ length: 8 }, () => Array(8).fill(null));
+    }
+
+    function setupInitialPosition() {
+      createEmptyBoard();
+      const backRank = ["R", "N", "B", "Q", "K", "B", "N", "R"];
+
+      for (let c = 0; c < 8; c++) {
+        board[0][c] = { color: "black", type: backRank[c], symbol: PIECES.black[backRank[c]] };
+        board[1][c] = { color: "black", type: "P", symbol: PIECES.black.P };
+        board[6][c] = { color: "white", type: "P", symbol: PIECES.white.P };
+        board[7][c] = { color: "white", type: backRank[c], symbol: PIECES.white[backRank[c]] };
+      }
+    }
+
+    function buildBoardUI() {
+      boardElement.innerHTML = "";
+      const rows = flipped ? [...Array(8).keys()] : [...Array(8).keys()].reverse();
+      const cols = flipped ? [...Array(8).keys()].reverse() : [...Array(8).keys()];
+
+      for (let ri = 0; ri < 8; ri++) {
+        const r = rows[ri];
+        const row = document.createElement("tr");
+        for (let ci = 0; ci < 8; ci++) {
+          const c = cols[ci];
+          const cell = document.createElement("td");
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+
+          const isLight = (r + c) % 2 === 0;
+          cell.className = isLight ? "light" : "dark";
+
+          const piece = board[r][c];
+          cell.textContent = piece ? piece.symbol : "";
+
+          if (selected && selected.row === r && selected.col === c) {
+            cell.classList.add("selected");
+          }
+
+          if (lastMove &&
+              ((lastMove.from.row === r && lastMove.from.col === c) ||
+               (lastMove.to.row === r && lastMove.to.col === c))) {
+            cell.classList.add("highlight-move");
+          }
+
+          cell.addEventListener("click", onCellClick);
+          row.appendChild(cell);
+        }
+        boardElement.appendChild(row);
+      }
+
+      if (selected) {
+        highlightLegalMoves(selected.row, selected.col);
+      }
+    }
+
+    function clearHighlights() {
+      const cells = boardElement.getElementsByTagName("td");
+      for (const cell of cells) {
+        cell.classList.remove("selected", "highlight-move");
+        const dot = cell.querySelector(".dot");
+        const ring = cell.querySelector(".capture-ring");
+        if (dot) dot.remove();
+        if (ring) ring.remove();
+      }
+    }
+
+    function inBounds(r, c) {
+      return r >= 0 && r < 8 && c >= 0 && c < 8;
+    }
+
+    function cloneBoard(b) {
+      return b.map(row => row.map(cell => cell ? { ...cell } : null));
+    }
+
+    function isSquareAttacked(b, row, col, byColor) {
+      const directions = {
+        knight: [
+          [2,1],[1,2],[-1,2],[-2,1],
+          [-2,-1],[-1,-2],[1,-2],[2,-1]
+        ],
+        king: [
+          [1,0],[1,1],[0,1],[-1,1],
+          [-1,0],[-1,-1],[0,-1],[1,-1]
+        ],
+        bishop: [[1,1],[1,-1],[-1,1],[-1,-1]],
+        rook: [[1,0],[-1,0],[0,1],[0,-1]]
+      };
+
+      for (const [dr,dc] of directions.knight) {
+        const r = row + dr, c = col + dc;
+        if (!inBounds(r,c)) continue;
+        const p = b[r][c];
+        if (p && p.color === byColor && p.type === "N") return true;
+      }
+
+      for (const [dr,dc] of directions.king) {
+        const r = row + dr, c = col + dc;
+        if (!inBounds(r,c)) continue;
+        const p = b[r][c];
+        if (p && p.color === byColor && p.type === "K") return true;
+      }
+
+      for (const [dr,dc] of directions.bishop) {
+        let r = row + dr, c = col + dc;
+        while (inBounds(r,c)) {
+          const p = b[r][c];
+          if (p) {
+            if (p.color === byColor && (p.type === "B" || p.type === "Q")) return true;
+            break;
+          }
+          r += dr; c += dc;
+        }
+      }
+
+      for (const [dr,dc] of directions.rook) {
+        let r = row + dr, c = col + dc;
+        while (inBounds(r,c)) {
+          const p = b[r][c];
+          if (p) {
+            if (p.color === byColor && (p.type === "R" || p.type === "Q")) return true;
+            break;
+          }
+          r += dr; c += dc;
+        }
+      }
+
+      const forward = byColor === "white" ? -1 : 1;
+      for (const dc of [-1, 1]) {
+        const r = row + forward, c = col + dc;
+        if (!inBounds(r,c)) continue;
+        const p = b[r][c];
+        if (p && p.color === byColor && p.type === "P") return true;
+      }
+
+      return false;
+    }
+
+    function findKing(b, color) {
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const p = b[r][c];
+          if (p && p.color === color && p.type === "K") {
+            return { r, c };
+          }
+        }
+      }
+      return null;
+    }
+
+    function wouldLeaveKingInCheck(fromR, fromC, toR, toC) {
+      const copy = cloneBoard(board);
+      const piece = copy[fromR][fromC];
+      copy[toR][toC] = piece;
+      copy[fromR][fromC] = null;
+
+      const kingPos = findKing(copy, piece.color);
+      if (!kingPos) return true;
+      const enemyColor = piece.color === "white" ? "black" : "white";
+      return isSquareAttacked(copy, kingPos.r, kingPos.c, enemyColor);
+    }
+
+    function getLegalMoves(r, c) {
+      const piece = board[r][c];
+      if (!piece) return [];
+      const moves = [];
+      const color = piece.color;
+      const forward = color === "white" ? -1 : 1;
+
+      function addMoveIfValid(tr, tc, captureOnly = false, emptyOnly = false) {
+        if (!inBounds(tr,tc)) return;
+        const target = board[tr][tc];
+        if (emptyOnly && target) return;
+        if (captureOnly && (!target || target.color === color)) return;
+        if (target && target.color === color) return;
+        if (wouldLeaveKingInCheck(r, c, tr, tc)) return;
+        moves.push({ row: tr, col: tc, capture: !!target });
+      }
+
+      switch (piece.type) {
+        case "P": {
+          const startRow = color === "white" ? 6 : 1;
+          const oneStep = { r: r + forward, c: c };
+          if (inBounds(oneStep.r, oneStep.c) && !board[oneStep.r][oneStep.c]) {
+            addMoveIfValid(oneStep.r, oneStep.c, false, true);
+            const twoStep = { r: r + 2 * forward, c: c };
+            if (r === startRow && inBounds(twoStep.r,twoStep.c) && !board[twoStep.r][twoStep.c]) {
+              addMoveIfValid(twoStep.r, twoStep.c, false, true);
+            }
+          }
+          for (const dc of [-1, 1]) {
+            const tr = r + forward, tc = c + dc;
+            addMoveIfValid(tr, tc, true, false);
+          }
+          break;
+        }
+
+        case "N": {
+          const knightMoves = [
+            [2,1],[1,2],[-1,2],[-2,1],
+            [-2,-1],[-1,-2],[1,-2],[2,-1]
+          ];
+          for (const [dr,dc] of knightMoves) {
+            addMoveIfValid(r+dr, c+dc);
+          }
+          break;
+        }
+
+        case "B": {
+          for (const [dr,dc] of [[1,1],[1,-1],[-1,1],[-1,-1]]) {
+            let tr = r + dr, tc = c + dc;
+            while (inBounds(tr,tc)) {
+              const target = board[tr][tc];
+              if (!target) {
+                addMoveIfValid(tr, tc);
+              } else {
+                if (target.color !== color && !wouldLeaveKingInCheck(r,c,tr,tc)) {
+                  moves.push({ row: tr, col: tc, capture: true });
+                }
+                break;
+              }
+              tr += dr; tc += dc;
+            }
+          }
+          break;
+        }
+
+        case "R": {
+          for (const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            let tr = r + dr, tc = c + dc;
+            while (inBounds(tr,tc)) {
+              const target = board[tr][tc];
+              if (!target) {
+                addMoveIfValid(tr, tc);
+              } else {
+                if (target.color !== color && !wouldLeaveKingInCheck(r,c,tr,tc)) {
+                  moves.push({ row: tr, col: tc, capture: true });
+                }
+                break;
+              }
+              tr += dr; tc += dc;
+            }
+          }
+          break;
+        }
+
+        case "Q": {
+          for (const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+            let tr = r + dr, tc = c + dc;
+            while (inBounds(tr,tc)) {
+              const target = board[tr][tc];
+              if (!target) {
+                addMoveIfValid(tr, tc);
+              } else {
+                if (target.color !== color && !wouldLeaveKingInCheck(r,c,tr,tc)) {
+                  moves.push({ row: tr, col: tc, capture: true });
+                }
+                break;
+              }
+              tr += dr; tc += dc;
+            }
+          }
+          break;
+        }
+
+        case "K": {
+          for (const [dr,dc] of [
+            [1,0],[1,1],[0,1],[-1,1],
+            [-1,0],[-1,-1],[0,-1],[1,-1]
+          ]) {
+            addMoveIfValid(r+dr, c+dc);
+          }
+          break;
+        }
+      }
+
+      return moves;
+    }
+
+    function coordToAlg(r,c) {
+      const file = String.fromCharCode("a".charCodeAt(0) + c);
+      const rank = 8 - r;
+      return file + rank;
+    }
+
+    function logMove(piece, fromR, fromC, toR, toC, capture) {
+      const moveNum = Math.floor(moveHistory.length / 2) + 1;
+      const from = coordToAlg(fromR, fromC);
+      const to = coordToAlg(toR, toC);
+      const pieceLetter = piece.type === "P" ? "" : piece.type;
+      const captureMark = capture ? "x" : "-";
+      const notation = pieceLetter + from + captureMark + to;
+
+      if (piece.color === "white") {
+        moveHistory.push({ moveNum, white: notation, black: "" });
+      } else {
+        moveHistory[moveHistory.length - 1].black = notation;
+      }
+
+      let text = "";
+      for (const m of moveHistory) {
+        text += `${m.moveNum}. ${m.white}`;
+        if (m.black) text += `   ${m.black}`;
+        text += "\n";
+      }
+      movesElement.textContent = text.trim();
+      movesElement.scrollTop = movesElement.scrollHeight;
+    }
+
+    function highlightLegalMoves(r, c) {
+      const legal = getLegalMoves(r, c);
+      const cells = boardElement.getElementsByTagName("td");
+      for (const cell of cells) {
+        const tr = parseInt(cell.dataset.row,10);
+        const tc = parseInt(cell.dataset.col,10);
+        const match = legal.find(m => m.row === tr && m.col === tc);
+        if (match) {
+          if (match.capture) {
+            const ring = document.createElement("div");
+            ring.className = "capture-ring";
+            cell.appendChild(ring);
+          } else {
+            const dot = document.createElement("div");
+            dot.className = "dot";
+            cell.appendChild(dot);
+          }
+        }
+      }
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    }
+
+    function updateClocks() {
+      whiteClock.textContent = `White: ${formatTime(whiteTime)}`;
+      blackClock.textContent = `Black: ${formatTime(blackTime)}`;
+      whiteClock.classList.toggle("active", currentTurn === "white" && !clocksPaused && !gameOver);
+      blackClock.classList.toggle("active", currentTurn === "black" && !clocksPaused && !gameOver);
+    }
+
+    function tickClocks() {
+      if (clocksPaused || gameOver) return;
+      if (currentTurn === "white") {
+        if (whiteTime > 0) whiteTime--;
+      } else {
+        if (blackTime > 0) blackTime--;
+      }
+      updateClocks();
+    }
+
+    function startClocks() {
+      if (clockInterval) clearInterval(clockInterval);
+      clockInterval = setInterval(tickClocks, 1000);
+    }
+
+    function updateStatus(extra = "") {
+      let base = `Turn: ${currentTurn === "white" ? "White" : "Black"} • Click a piece to move`;
+      if (extra) base += " • " + extra;
+      if (gameOver) base = "Game over • " + extra;
+      statusElement.textContent = base;
+    }
+
+    function resetGame() {
+      setupInitialPosition();
+      currentTurn = "white";
+      selected = null;
+      lastMove = null;
+      moveHistory = [];
+      movesElement.textContent = "";
+      clearHighlights();
+
+      whiteTime = 5 * 60;
+      blackTime = 5 * 60;
+      clocksPaused = false;
+      pauseBtn.textContent = "Pause clocks";
+      gameOver = false;
+
+      function applyMode() {
+  mode = modeSelect.value;
+
+  if (mode === "hvh") {
+    botColor = null;
+    flipped = false; // White at bottom
+    updateStatus("Human vs Human");
+  } else if (mode === "hvb") {
+    botColor = "black";
+    flipped = false; // You are White, White at bottom
+    updateStatus("You are White vs Bot (Black)");
+  } else if (mode === "bvh") {
+    botColor = "white";
+    flipped = true; // You are Black, Black at bottom
+    updateStatus("Bot (White) vs You (Black)");
+  }
+}
+      updateClocks();
+      updateStatus();
+      buildBoardUI();
+      startClocks();
+
+      // If bot is white, let it move first
+      maybeTriggerBot();
+    }
+
+    function flipBoard() {
+      flipped = !flipped;
+      buildBoardUI();
+    }
+
+    function togglePause() {
+      clocksPaused = !clocksPaused;
+      pauseBtn.textContent = clocksPaused ? "Resume clocks" : "Pause clocks";
+      updateClocks();
+    }
+
+    function applyMode() {
+      mode = modeSelect.value;
+      if (mode === "hvh") {
+        botColor = null;
+        updateStatus("Human vs Human");
+      } else if (mode === "hvb") {
+        botColor = "black";
+        updateStatus("You are White vs Bot (Black)");
+      } else if (mode === "bvh") {
+        botColor = "white";
+        updateStatus("Bot (White) vs You (Black)");
+      }
+    }
+
+    function getAllLegalMovesFor(color) {
+      const moves = [];
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const p = board[r][c];
+          if (p && p.color === color) {
+            const legal = getLegalMoves(r, c);
+            for (const m of legal) {
+              moves.push({
+                fromR: r,
+                fromC: c,
+                toR: m.row,
+                toC: m.col,
+                capture: m.capture,
+                piece: p
+              });
+            }
+          }
+        }
+      }
+      return moves;
+    }
+
+    function botChooseMove(color) {
+      const moves = getAllLegalMovesFor(color);
+      if (moves.length === 0) return null;
+
+      let bestScore = -Infinity;
+      let bestMoves = [];
+
+      for (const m of moves) {
+        let score = 0;
+        if (m.capture) {
+          const target = board[m.toR][m.toC];
+          if (target) {
+            score += pieceValues[target.type] || 0;
+          }
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestMoves = [m];
+        } else if (score === bestScore) {
+          bestMoves.push(m);
+        }
+      }
+
+      const choice = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+      return choice;
+    }
+
+    function performMove(fromR, fromC, toR, toC) {
+      const fromPiece = board[fromR][fromC];
+      const capture = !!board[toR][toC];
+
+      board[toR][toC] = fromPiece;
+      board[fromR][fromC] = null;
+
+      if (fromPiece.type === "P" && (toR === 0 || toR === 7)) {
+        fromPiece.type = "Q";
+        fromPiece.symbol = PIECES[fromPiece.color].Q;
+      }
+
+      lastMove = {
+        from: { row: fromR, col: fromC },
+        to: { row: toR, col: toC }
+      };
+
+      logMove(fromPiece, fromR, fromC, toR, toC, capture);
+
+      currentTurn = currentTurn === "white" ? "black" : "white";
+      clearHighlights();
+      buildBoardUI();
+      updateStatus();
+      updateClocks();
+    }
+
+    function maybeTriggerBot() {
+      if (gameOver) return;
+      if (!botColor) return;
+      if (currentTurn !== botColor) return;
+
+      setTimeout(() => {
+        if (gameOver) return;
+        const move = botChooseMove(botColor);
+        if (!move) {
+          gameOver = true;
+          updateStatus("Bot has no legal moves");
+          return;
+        }
+        performMove(move.fromR, move.fromC, move.toR, move.toC);
+        maybeTriggerBot();
+      }, 300); // slight delay so it feels natural
+    }
+
+    function onCellClick(e) {
+      if (gameOver) return;
+
+      const cell = e.currentTarget;
+      const row = parseInt(cell.dataset.row, 10);
+      const col = parseInt(cell.dataset.col, 10);
+      const piece = board[row][col];
+
+      // If it's bot's turn, ignore human clicks
+      if (botColor && currentTurn === botColor) {
+        return;
+      }
+
+      if (!selected) {
+        if (!piece || piece.color !== currentTurn) return;
+        selected = { row, col };
+        clearHighlights();
+        buildBoardUI();
+        return;
+      }
+
+      if (selected.row === row && selected.col === col) {
+        selected = null;
+        clearHighlights();
+        buildBoardUI();
+        return;
+      }
+
+      const legalMoves = getLegalMoves(selected.row, selected.col);
+      const targetMove = legalMoves.find(m => m.row === row && m.col === col);
+      if (!targetMove) return;
+
+      const fromPiece = board[selected.row][selected.col];
+      const capture = !!board[row][col];
+
+      board[row][col] = fromPiece;
+      board[selected.row][selected.col] = null;
+
+      if (fromPiece.type === "P" && (row === 0 || row === 7)) {
+        fromPiece.type = "Q";
+        fromPiece.symbol = PIECES[fromPiece.color].Q;
+      }
+
+      lastMove = {
+        from: { row: selected.row, col: selected.col },
+        to: { row, col }
+      };
+
+      logMove(fromPiece, selected.row, selected.col, row, col, capture);
+
+      selected = null;
+      currentTurn = currentTurn === "white" ? "black" : "white";
+      clearHighlights();
+      buildBoardUI();
+      updateStatus();
+      updateClocks();
+
+      maybeTriggerBot();
+    }
+
+    resetBtn.addEventListener("click", resetGame);
+    flipBtn.addEventListener("click", flipBoard);
+    pauseBtn.addEventListener("click", togglePause);
+    modeSelect.addEventListener("change", () => {
+      applyMode();
+      resetGame(); // restart game when mode changes
+    });
+
+    setupInitialPosition();
+    applyMode();
+    updateStatus();
+    updateClocks();
+    buildBoardUI();
+    startClocks();
+    maybeTriggerBot();
+  </script>
+</body>
+</html>
